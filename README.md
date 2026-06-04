@@ -57,4 +57,4 @@ state with colors, animations and on-screen text.
 
 ## 📄 License
 
-[MIT](LICENSE.md)
+[MIT](LICENSE)
