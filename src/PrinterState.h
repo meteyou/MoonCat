@@ -1,0 +1,17 @@
+#pragma once
+
+// Global printer status (switch between views)
+enum class PrinterStatus { Standby, Printing, Paused, Complete, Error, Offline };
+
+// Shared printer states
+struct PrinterState {
+    bool          klippyReady = false;
+    PrinterStatus status      = PrinterStatus::Offline;
+    float         progress    = 0.0f;
+    bool          dirty       = false;
+};
+
+extern PrinterState printerState;
+
+// Moonraker-String -> Enum
+PrinterStatus stateToStatus(const char* state);
