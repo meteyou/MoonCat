@@ -2,8 +2,15 @@
 #include "Display.h"
 #include "PrinterState.h"
 
-// define the I2C address and create the U8G2 object for the OLED display
+// Select the display controller via build flag:
+//   -D DISPLAY_SSD1306  -> SSD1306 controller mostly for 0.96" OLED
+//   -D DISPLAY_SH1106   -> SH1106 controller mostly for 1.3" OLED
+#if defined(DISPLAY_SSD1306)
+static U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R2, U8X8_PIN_NONE);
+#else
 static U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R2, U8X8_PIN_NONE);
+#endif
+
 static DisplayView currentView = DisplayView::Status;
 
 static void drawStatusView() {

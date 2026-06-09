@@ -39,7 +39,7 @@ reflects the live print state with colors, animations and on-screen text.
 |---------|-------|
 | MCU     | Wemos D1 mini (ESP8266) |
 | LED     | WS2812B NeoPixel (single pixel in the cat's head) |
-| Display | 0.96″ OLED, **SH1106** controller, I²C |
+| Display | 1.3″ OLED (**SH1106**) **or** 0.96″ OLED (**SSD1306**), I²C |
 | Model   | [Illumination Cat](https://www.printables.com/model/96457-illumination-cat) |
 
 ## Wiring / Pinout
@@ -61,23 +61,50 @@ Notes:
 - Power the **OLED from `3V3`, not `5V`**. The module's I²C pull-ups tie SDA/SCL
   to VCC, and the ESP8266 GPIOs are not 5 V tolerant — running the OLED at 3.3 V
   keeps the I²C levels safe for the MCU.
+- **Two display controllers are supported.** Pick the matching firmware/build
+  for your panel (see [Build & flash](#build--flash)):
+  - **1.3"** panels almost use the **SH1106** controller.
+  - **0.96"** panels almost use the **SSD1306** controller.
+  Using the wrong controller leaves a stray column of pixels on the right edge
+  (a 2-pixel offset), so make sure you flash the right one.
 - If your OLED reports a different I²C address or controller, adjust the U8g2
-  constructor in `src/main.cpp`.
+  constructor in `src/Display.cpp`.
 
 ## Build & flash
 
-MoonCat is built with [PlatformIO](https://platformio.org/).
+MoonCat is built with [PlatformIO](https://platformio.org/). There are two build
+environments — one per display controller. Pick the one that matches your OLED:
+
+| Display | Env | Binary |
+|---------|-----|--------|
+| 1.3" (SH1106)  | `d1_mini`         | `.pio/build/d1_mini/firmware.bin` |
+| 0.96" (SSD1306) | `d1_mini_ssd1306` | `.pio/build/d1_mini_ssd1306/firmware.bin` |
 
 ```bash
 # clone, then from the project folder:
-pio run                       # build
-pio run -t upload             # flash over USB
-pio device monitor            # serial console @ 115200
+
+# --- 1.3" display (SH1106) ---
+pio run -e d1_mini                      # build
+pio run -e d1_mini -t upload            # flash over USB
+
+# --- 0.96" display (SSD1306) ---
+pio run -e d1_mini_ssd1306              # build
+pio run -e d1_mini_ssd1306 -t upload    # flash over USB
+
+# build both at once:
+pio run -e d1_mini -e d1_mini_ssd1306
+
+pio device monitor                      # serial console @ 115200
 ```
 
+> **Pre-built binaries:** if you don't want to set up PlatformIO, grab the
+> ready-made `.bin` for your panel from the releases and flash it directly:
+> - `mooncat-sh1106.bin` → 1.3″ display
+> - `mooncat-ssd1306.bin` → 0.96″ display
+
 **Wireless updates:** once MoonCat is on your network, open its IP in a browser,
-hit **Update**, and upload the freshly built binary from
-`.pio/build/d1_mini/firmware.bin`. No USB cable required.
+hit **Update**, and upload the freshly built binary for your display
+(`.pio/build/<env>/firmware.bin`). No USB cable required.
 
 ## First-time setup
 
@@ -114,7 +141,7 @@ stored Wi-Fi + Moonraker config and reopens the `MoonCat-Setup` portal.
 - **C++ / Arduino** framework via **[PlatformIO](https://platformio.org/)**
 - [WiFiManager](https://github.com/tzapu/WiFiManager) — captive-portal Wi-Fi & config + web update
 - [NeoPixelBus](https://github.com/Makuna/NeoPixelBus) — WS2812B driver (DMA)
-- [U8g2](https://github.com/olikraus/u8g2) — SH1106 OLED driver
+- [U8g2](https://github.com/olikraus/u8g2) — SH1106 / SSD1306 OLED driver
 - [arduinoWebSockets](https://github.com/Links2004/arduinoWebSockets) — Websocket Lib
 - [ArduinoJson](https://arduinojson.org/) — Parse the Moonraker responses
 - [ESP_DoubleResetDetector](https://github.com/khoih-prog/ESP_DoubleResetDetector) — double-press reset trigger
