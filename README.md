@@ -99,8 +99,8 @@ pio device monitor                      # serial console @ 115200
 
 > **Pre-built binaries:** if you don't want to set up PlatformIO, grab the
 > ready-made `.bin` for your panel from the releases and flash it directly:
-> - `mooncat-sh1106.bin` → 1.3″ display
-> - `mooncat-ssd1306.bin` → 0.96″ display
+> - `mooncat-sh1106.bin` → 1.3" display
+> - `mooncat-ssd1306.bin` → 0.96" display
 
 **Wireless updates:** once MoonCat is on your network, open its IP in a browser,
 hit **Update**, and upload the freshly built binary for your display
