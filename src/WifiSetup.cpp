@@ -4,10 +4,12 @@
 #include <LittleFS.h>
 #include <WiFiManager.h>
 
+#include "Display.h"
 #include "WifiSetup.h"
 
 static WiFiManager wm;
 
+static char apName[16] = "MoonCat-Setup";
 static char moonrakerHost[40] = "192.168.0.50";
 static char moonrakerPort[6]  = "7125";
 
@@ -67,13 +69,24 @@ void wifi_begin() {
     wm.addParameter(&custom_port);
     wm.setSaveParamsCallback(saveParamsCallback);
 
-    bool ok = wm.autoConnect("MoonCat-Setup");
+    snprintf(apName, sizeof(apName), "MoonCat-%06X", ESP.getChipId());
+
+    wm.setAPCallback([](WiFiManager*) {
+        display_setWifiAP(apName);
+        display_setView(DisplayView::WifiGuide);
+        display_render();
+    });
+
+    bool ok = wm.autoConnect(apName);
     if (!ok) {
         Serial.println(F("Config/Connect failed -> reboot!"));
         ESP.restart();
     }
     Serial.println("WiFi connected");
     Serial.println(WiFi.localIP());
+
+    // switch back to status view, because wifi setup is finished
+    display_setView(DisplayView::Status);
 
     wm.startWebPortal();
 }

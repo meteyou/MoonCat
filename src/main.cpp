@@ -28,9 +28,9 @@ void setup() {
         wifi_factoryReset();
     }
 
+    display_begin();
     wifi_begin();
     led_begin();
-    display_begin();
     moonraker_begin(wifi_moonraker_host(), wifi_moonraker_port());
 
     Serial.printf("Setup complete, heap=%u\n", ESP.getFreeHeap());
