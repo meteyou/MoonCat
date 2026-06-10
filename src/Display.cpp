@@ -18,7 +18,7 @@ static void drawStatusView() {
     char line[24];
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_profont15_tr);
-    u8g2.drawStr(2, 12, "MoonCat");
+    u8g2.drawStr(2, 12, printerState.printerName);
     snprintf(line, sizeof(line), "Progress: %d%%", (int)(printerState.progress * 100));
     u8g2.drawStr(2, 40, line);
     u8g2.sendBuffer();

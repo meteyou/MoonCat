@@ -5,10 +5,11 @@ enum class PrinterStatus { Standby, Printing, Paused, Complete, Error, Offline }
 
 // Shared printer states
 struct PrinterState {
-    bool          klippyReady = false;
-    PrinterStatus status      = PrinterStatus::Offline;
-    float         progress    = 0.0f;
-    bool          dirty       = false;
+    char          printerName[32]   = "MoonCat";
+    bool          klippyReady       = false;
+    PrinterStatus status            = PrinterStatus::Offline;
+    float         progress          = 0.0f;
+    bool          dirty             = false;
 };
 
 extern PrinterState printerState;

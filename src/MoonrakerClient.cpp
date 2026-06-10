@@ -17,6 +17,7 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
         case WStype_CONNECTED: {
             Serial.println(F("WS connected"));
             webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.info","id":2})");
+            webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.database.get_item","params":{"namespace":"mainsail","key":"general.printername"},"id":3})");
             subscribe();
             break;
         }
@@ -51,15 +52,29 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
             JsonDocument doc;
             if (deserializeJson(doc, msg)) return;
 
+            // server.info response for init klippy state
+            if (doc["id"] == 2) {
+                const char* klippy_state = doc["result"]["klippy_state"];
+                printerState.klippyReady = (klippy_state && strcmp(klippy_state, "ready") == 0);
+
+                return;
+            }
+
+            // get mainsail printer name from moonraker db
+            if (doc["id"] == 3) {
+                const char* name = doc["result"]["value"];
+                if (name && name[0] != '\0') {
+                    strlcpy(printerState.printerName, name, sizeof(printerState.printerName));
+                    printerState.dirty = true;
+                }
+                
+                return;
+            }
+
             JsonObject status;
             // init data after subscribe
             if (doc["id"] == 1) {
                 status = doc["result"]["status"];
-
-            // server.info response
-            } else if (doc["id"] == 2) {
-                const char* klippy_state = doc["result"]["klippy_state"];
-                printerState.klippyReady = (klippy_state && strcmp(klippy_state, "ready") == 0);
             
             // delta status update
             } else if (strstr(msg, "notify_status_update")) {
