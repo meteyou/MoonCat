@@ -3,6 +3,7 @@
 #include <string.h>
 #include <WebSocketsClient.h>
 
+#include "Display.h"
 #include "MoonrakerClient.h"
 #include "PrinterState.h"
 
@@ -19,6 +20,7 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
             webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.info","id":2})");
             webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.database.get_item","params":{"namespace":"mainsail","key":"general.printername"},"id":3})");
             subscribe();
+            display_setView(DisplayView::Status);
             break;
         }
 
@@ -26,7 +28,7 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
             Serial.println(F("WS disconnected"));
             printerState.klippyReady = false;
             printerState.status = PrinterStatus::Offline;
-            printerState.dirty = true;
+            display_setView(DisplayView::Offline);
             break;
         }
 
@@ -38,7 +40,7 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
 
             if (strstr(msg, "notify_klippy_shutdown") || strstr(msg, "notify_klippy_disconnected")) {
                 printerState.status = PrinterStatus::Error;
-                printerState.dirty = true;
+                display_makeDirty();
                 printerState.klippyReady = false;
                 return;
             }
@@ -65,7 +67,7 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
                 const char* name = doc["result"]["value"];
                 if (name && name[0] != '\0') {
                     strlcpy(printerState.printerName, name, sizeof(printerState.printerName));
-                    printerState.dirty = true;
+                    display_makeDirty();
                 }
                 
                 return;
@@ -86,17 +88,18 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
             // update currentStatus if it exists
             if (!status["print_stats"]["state"].isNull()) {
                 printerState.status = stateToStatus(status["print_stats"]["state"]);
-                printerState.dirty = true;
 
                 if (!printerState.klippyReady) {
                     printerState.status = PrinterStatus::Error;
                 }
+                
+                display_makeDirty();
             }
 
             // update progress if it exists
             if (!status["display_status"]["progress"].isNull()) {
                 printerState.progress = status["display_status"]["progress"];
-                printerState.dirty = true;
+                display_makeDirty();
             }
 
             break;
@@ -113,6 +116,7 @@ void moonraker_begin(const char* host, uint16_t port) {
     webSocket.setExtraHeaders("");
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(5000);
+    webSocket.enableHeartbeat(15000, 3000, 2);
 }
 
 void moonraker_loop() {

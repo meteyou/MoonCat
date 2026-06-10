@@ -31,6 +31,7 @@ void setup() {
     display_begin();
     wifi_begin();
     led_begin();
+    display_setMoonrakerTarget(wifi_moonraker_host(), wifi_moonraker_port());
     moonraker_begin(wifi_moonraker_host(), wifi_moonraker_port());
 
     Serial.printf("Setup complete, heap=%u\n", ESP.getFreeHeap());
@@ -46,10 +47,8 @@ void loop() {
     // execute websocket
     moonraker_loop();
 
-    if (printerState.dirty) {
-        printerState.dirty = false;
-        display_render();
-    }
+    // display rendering
+    display_render();
 
     if (millis() - lastFrame >= interval) {
         lastFrame = millis();

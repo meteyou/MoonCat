@@ -86,7 +86,7 @@ void wifi_begin() {
     Serial.println(WiFi.localIP());
 
     // switch back to status view, because wifi setup is finished
-    display_setView(DisplayView::Status);
+    display_setView(DisplayView::Offline);
 
     wm.startWebPortal();
 }

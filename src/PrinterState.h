@@ -9,7 +9,6 @@ struct PrinterState {
     bool          klippyReady       = false;
     PrinterStatus status            = PrinterStatus::Offline;
     float         progress          = 0.0f;
-    bool          dirty             = false;
 };
 
 extern PrinterState printerState;

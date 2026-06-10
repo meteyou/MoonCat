@@ -11,8 +11,17 @@ static U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R2, U8X8_PIN_NONE);
 static U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R2, U8X8_PIN_NONE);
 #endif
 
-static DisplayView currentView = DisplayView::Status;
-static char wifiApSsid[40];
+static DisplayView  currentView         = DisplayView::Offline;
+static bool         needsRender         = true;
+static char         wifiApSsid[40];
+static char         moonrakerHost[40]   = "";
+static uint16_t     moonrakerPort       = 0;
+
+// draw a string horizontally centered at baseline y
+static void drawCentered(const char* s, int y) {
+    int w = u8g2.getStrWidth(s);
+    u8g2.drawStr((128 - w) / 2, y, s);
+}
 
 static void drawStatusView() {
     char line[24];
@@ -22,12 +31,6 @@ static void drawStatusView() {
     snprintf(line, sizeof(line), "Progress: %d%%", (int)(printerState.progress * 100));
     u8g2.drawStr(2, 40, line);
     u8g2.sendBuffer();
-}
-
-// draw a string horizontally centered at baseline y
-static void drawCentered(const char* s, int y) {
-    int w = u8g2.getStrWidth(s);
-    u8g2.drawStr((128 - w) / 2, y, s);
 }
 
 static void drawWifiGuideView() {
@@ -50,8 +53,43 @@ static void drawWifiGuideView() {
     u8g2.sendBuffer();
 }
 
+static void drawOfflineView() {
+       u8g2.clearBuffer();
+
+       // center points
+       const int cx = 64;
+       const int cy = 24;
+
+       u8g2.drawDisc(cx, cy, 2);
+       u8g2.drawCircle(cx, cy, 7,  U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+       u8g2.drawCircle(cx, cy, 12, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+       u8g2.drawCircle(cx, cy, 17, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+
+       u8g2.drawLine(cx - 19, cy + 5, cx + 17, cy - 19);
+       u8g2.drawLine(cx - 18, cy + 5, cx + 18, cy - 19);
+
+       u8g2.setFont(u8g2_font_profont15_tr);
+       drawCentered("Printer offline", 46);
+
+       char target[48];
+       snprintf(target, sizeof(target), "%s:%u", moonrakerHost, moonrakerPort);
+
+       u8g2.setFont(u8g2_font_6x10_tr);
+       if (u8g2.getStrWidth(target) > 126) {
+           u8g2.setFont(u8g2_font_4x6_tr);
+       }
+       drawCentered(target, 60);
+
+       u8g2.sendBuffer();
+   }
+
 void display_setWifiAP(const char* ssid) {
     strlcpy(wifiApSsid, ssid, sizeof(wifiApSsid));
+}
+
+void display_setMoonrakerTarget(const char* host, uint16_t port) {
+    strlcpy(moonrakerHost, host, sizeof(moonrakerHost));
+    moonrakerPort = port;
 }
 
 void display_begin() {
@@ -59,12 +97,27 @@ void display_begin() {
     u8g2.setBusClock(100000);
 }
 
+void display_makeDirty() {
+    needsRender = true;
+}
+
 void display_setView(DisplayView view) {
+    if (currentView == view) {
+        return;
+    }
+
     currentView = view;
+    needsRender = true;
 }
 
 void display_render() {
+    if (!needsRender) return;
+    needsRender = false;
+
     switch(currentView) {
+        case DisplayView::Offline:
+            drawOfflineView();
+            break;
         case DisplayView::Status:
             drawStatusView();
             break;
