@@ -17,6 +17,15 @@ static char         wifiApSsid[40];
 static char         moonrakerHost[40]   = "";
 static uint16_t     moonrakerPort       = 0;
 
+// format a temperature as "E 23°" or "E 23/210°" while heating
+static void formatTemp(char* buf, size_t len, const char* label, float actual, float target) {
+    if (target > 0.0f) {
+        snprintf(buf, len, "%s %d/%d\u00b0", label, (int)(actual + 0.5f), (int)(target + 0.5f));
+    } else {
+        snprintf(buf, len, "%s %d\u00b0", label, (int)(actual + 0.5f));
+    }
+}
+
 // draw a string horizontally centered at baseline y
 static void drawCentered(const char* s, int y) {
     int w = u8g2.getStrWidth(s);
@@ -54,34 +63,65 @@ static void drawWifiGuideView() {
 }
 
 static void drawOfflineView() {
-       u8g2.clearBuffer();
+    u8g2.clearBuffer();
 
-       // center points
-       const int cx = 64;
-       const int cy = 24;
+    // center points
+    const int cx = 64;
+    const int cy = 24;
 
-       u8g2.drawDisc(cx, cy, 2);
-       u8g2.drawCircle(cx, cy, 7,  U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
-       u8g2.drawCircle(cx, cy, 12, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
-       u8g2.drawCircle(cx, cy, 17, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+    u8g2.drawDisc(cx, cy, 2);
+    u8g2.drawCircle(cx, cy, 7,  U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+    u8g2.drawCircle(cx, cy, 12, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
+    u8g2.drawCircle(cx, cy, 17, U8G2_DRAW_UPPER_LEFT | U8G2_DRAW_UPPER_RIGHT);
 
-       u8g2.drawLine(cx - 19, cy + 5, cx + 17, cy - 19);
-       u8g2.drawLine(cx - 18, cy + 5, cx + 18, cy - 19);
+    u8g2.drawLine(cx - 19, cy + 5, cx + 17, cy - 19);
+    u8g2.drawLine(cx - 18, cy + 5, cx + 18, cy - 19);
 
-       u8g2.setFont(u8g2_font_profont15_tr);
-       drawCentered("Printer offline", 46);
+    u8g2.setFont(u8g2_font_profont15_tr);
+    drawCentered("Printer offline", 46);
 
-       char target[48];
-       snprintf(target, sizeof(target), "%s:%u", moonrakerHost, moonrakerPort);
+    char target[48];
+    snprintf(target, sizeof(target), "%s:%u", moonrakerHost, moonrakerPort);
 
-       u8g2.setFont(u8g2_font_6x10_tr);
-       if (u8g2.getStrWidth(target) > 126) {
-           u8g2.setFont(u8g2_font_4x6_tr);
-       }
-       drawCentered(target, 60);
+    u8g2.setFont(u8g2_font_6x10_tr);
+    if (u8g2.getStrWidth(target) > 126) {
+        u8g2.setFont(u8g2_font_4x6_tr);
+    }
+    drawCentered(target, 60);
 
-       u8g2.sendBuffer();
-   }
+    u8g2.sendBuffer();
+}
+
+static void drawStandbyView() {
+    char line[20];
+    u8g2.clearBuffer();
+
+    // header: printer name + separator
+    u8g2.setFont(u8g2_font_profont15_tr);
+    u8g2.drawStr(2, 12, printerState.printerName);
+    u8g2.drawHLine(0, 16, 128);
+
+    // big state label in the middle
+    const char* label = (printerState.status == PrinterStatus::Complete) ? "Done" : "Standby";
+    u8g2.setFont(u8g2_font_profont22_tr);
+    drawCentered(label, 42);
+
+    // temperatures at the bottom (UTF8 needed for the ° glyph)
+    u8g2.setFont(u8g2_font_6x10_tf);
+    formatTemp(line, sizeof(line), "E", printerState.extruderTemp, printerState.extruderTarget);
+
+    if (printerState.hasHeaterBed) {
+        // extruder left, bed right
+        u8g2.drawUTF8(2, 62, line);
+        formatTemp(line, sizeof(line), "B", printerState.bedTemp, printerState.bedTarget);
+        u8g2.drawUTF8(126 - u8g2.getUTF8Width(line), 62, line);
+    } else {
+        // extruder only -> centered
+        u8g2.drawUTF8((128 - u8g2.getUTF8Width(line)) / 2, 62, line);
+    }
+
+    u8g2.sendBuffer();
+}
 
 void display_setWifiAP(const char* ssid) {
     strlcpy(wifiApSsid, ssid, sizeof(wifiApSsid));
@@ -110,6 +150,28 @@ void display_setView(DisplayView view) {
     needsRender = true;
 }
 
+void display_computeView() {
+    switch(printerState.status) {
+        case PrinterStatus::Paused:
+        case PrinterStatus::Printing:
+            display_setView(DisplayView::Status);
+            break;
+
+        case PrinterStatus::Complete:
+        case PrinterStatus::Standby:
+            display_setView(DisplayView::Standby);
+            break;
+        
+        case PrinterStatus::Offline:
+            display_setView(DisplayView::Offline);
+            break;
+        
+        case PrinterStatus::Error:
+            display_setView(DisplayView::Status);
+            break;
+    }
+}
+
 void display_render() {
     if (!needsRender) return;
     needsRender = false;
@@ -117,6 +179,9 @@ void display_render() {
     switch(currentView) {
         case DisplayView::Offline:
             drawOfflineView();
+            break;
+        case DisplayView::Standby:
+            drawStandbyView();
             break;
         case DisplayView::Status:
             drawStatusView();

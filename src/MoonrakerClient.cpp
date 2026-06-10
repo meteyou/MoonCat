@@ -9,8 +9,39 @@
 
 static WebSocketsClient webSocket;
 
+static void sendObjectsList() {
+    webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"printer.objects.list","id":4})");
+}
+
+static void sendMainsailDbRequest() {
+    webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.database.get_item","params":{"namespace":"mainsail","key":"general.printername"},"id":3})");
+}
+
 static void subscribe() {
-    webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"printer.objects.subscribe","params":{"objects":{"print_stats":null,"display_status":null,"virtual_sdcard":null}},"id":1})");
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"jsonrpc\":\"2.0\","
+        "\"method\":\"printer.objects.subscribe\","
+        "\"params\":{\"objects\":{"
+            "\"print_stats\":null,"
+            "\"display_status\":null,"
+            "\"virtual_sdcard\":null,"
+            "\"extruder\":[\"temperature\",\"target\"]"
+            "%s"
+        "}},\"id\":1}",
+        printerState.hasHeaterBed ? ",\"heater_bed\":[\"temperature\",\"target\"]" : ""
+    );
+    webSocket.sendTXT(buf);
+}
+
+static void updateTemp(JsonVariant src, float& dst) {
+    if (src.isNull()) return;
+
+    float newVal = src.as<float>();
+    if ((int)(newVal + 0.5f) != (int)(dst + 0.5f)) {
+        display_makeDirty();
+    }
+    dst = newVal;
 }
 
 static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
@@ -18,9 +49,8 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
         case WStype_CONNECTED: {
             Serial.println(F("WS connected"));
             webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.info","id":2})");
-            webSocket.sendTXT(R"({"jsonrpc":"2.0","method":"server.database.get_item","params":{"namespace":"mainsail","key":"general.printername"},"id":3})");
-            subscribe();
-            display_setView(DisplayView::Status);
+            sendMainsailDbRequest();
+            sendObjectsList();
             break;
         }
 
@@ -28,7 +58,7 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
             Serial.println(F("WS disconnected"));
             printerState.klippyReady = false;
             printerState.status = PrinterStatus::Offline;
-            display_setView(DisplayView::Offline);
+            display_computeView();
             break;
         }
 
@@ -40,13 +70,14 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
 
             if (strstr(msg, "notify_klippy_shutdown") || strstr(msg, "notify_klippy_disconnected")) {
                 printerState.status = PrinterStatus::Error;
+                display_computeView();
                 display_makeDirty();
                 printerState.klippyReady = false;
                 return;
             }
 
             if (strstr(msg, "notify_klippy_ready")) {
-                subscribe();
+                sendObjectsList();
                 printerState.klippyReady = true;
                 return;
             }
@@ -73,6 +104,13 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
                 return;
             }
 
+            // get printer objects list
+            if (doc["id"] == 4) {
+                printerState.hasHeaterBed = (strstr(msg, "\"heater_bed\"") != nullptr);
+                subscribe();
+                return;
+            }
+
             JsonObject status;
             // init data after subscribe
             if (doc["id"] == 1) {
@@ -92,7 +130,8 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
                 if (!printerState.klippyReady) {
                     printerState.status = PrinterStatus::Error;
                 }
-                
+
+                display_computeView();
                 display_makeDirty();
             }
 
@@ -101,6 +140,11 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
                 printerState.progress = status["display_status"]["progress"];
                 display_makeDirty();
             }
+
+            updateTemp(status["extruder"]["temperature"],   printerState.extruderTemp);
+            updateTemp(status["extruder"]["target"],        printerState.extruderTarget);
+            updateTemp(status["heater_bed"]["temperature"], printerState.bedTemp);
+            updateTemp(status["heater_bed"]["target"],      printerState.bedTarget);
 
             break;
         }

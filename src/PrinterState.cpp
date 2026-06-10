@@ -1,5 +1,6 @@
-#include "PrinterState.h"
 #include <string.h>
+
+#include "PrinterState.h"
 
 PrinterState printerState;
 
