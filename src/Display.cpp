@@ -32,13 +32,59 @@ static void drawCentered(const char* s, int y) {
     u8g2.drawStr((128 - w) / 2, y, s);
 }
 
+// header: printer name + separator line
+static void drawHeader() {
+    u8g2.setFont(u8g2_font_profont15_tr);
+    u8g2.drawStr(2, 12, printerState.printerName);
+    u8g2.drawHLine(0, 16, 128);
+}
+
+// temperatures at the bottom
+static void drawTempFooter() {
+    char line[20];
+    u8g2.setFont(u8g2_font_6x10_tf);
+    formatTemp(line, sizeof(line), "E", printerState.extruderTemp, printerState.extruderTarget);
+
+    if (printerState.hasHeaterBed) {
+        // extruder left, bed right
+        u8g2.drawUTF8(2, 62, line);
+        formatTemp(line, sizeof(line), "B", printerState.bedTemp, printerState.bedTarget);
+        u8g2.drawUTF8(126 - u8g2.getUTF8Width(line), 62, line);
+    } else {
+        // extruder only -> centered
+        u8g2.drawUTF8((128 - u8g2.getUTF8Width(line)) / 2, 62, line);
+    }
+}
+
 static void drawStatusView() {
     char line[24];
     u8g2.clearBuffer();
+
+    drawHeader();
+
+    // state label left, percentage right
+    const char* label = "Printing";
+    if (printerState.status == PrinterStatus::Paused)     label = "Paused";
+    else if (printerState.status == PrinterStatus::Error) label = "Error";
+    else if (printerState.printDuration <= 0.0f)          label = "Preparing";
+
     u8g2.setFont(u8g2_font_profont15_tr);
-    u8g2.drawStr(2, 12, printerState.printerName);
-    snprintf(line, sizeof(line), "Progress: %d%%", (int)(printerState.progress * 100));
-    u8g2.drawStr(2, 40, line);
+    u8g2.drawStr(2, 32, label);
+
+    snprintf(line, sizeof(line), "%d%%", (int)(printerState.progress * 100.0f + 0.5f));
+    u8g2.drawStr(126 - u8g2.getStrWidth(line), 32, line);
+
+    // progress bar: outer frame + inner fill with 2px padding
+    const int barX = 2, barY = 37, barW = 124, barH = 9;
+    u8g2.drawFrame(barX, barY, barW, barH);
+
+    int fill = (int)((barW - 4) * printerState.progress + 0.5f);
+    if (fill > 0) {
+        u8g2.drawBox(barX + 2, barY + 2, fill, barH - 4);
+    }
+
+    drawTempFooter();
+
     u8g2.sendBuffer();
 }
 
@@ -93,32 +139,16 @@ static void drawOfflineView() {
 }
 
 static void drawStandbyView() {
-    char line[20];
     u8g2.clearBuffer();
 
-    // header: printer name + separator
-    u8g2.setFont(u8g2_font_profont15_tr);
-    u8g2.drawStr(2, 12, printerState.printerName);
-    u8g2.drawHLine(0, 16, 128);
+    drawHeader();
 
     // big state label in the middle
     const char* label = (printerState.status == PrinterStatus::Complete) ? "Done" : "Standby";
     u8g2.setFont(u8g2_font_profont22_tr);
     drawCentered(label, 42);
 
-    // temperatures at the bottom (UTF8 needed for the ° glyph)
-    u8g2.setFont(u8g2_font_6x10_tf);
-    formatTemp(line, sizeof(line), "E", printerState.extruderTemp, printerState.extruderTarget);
-
-    if (printerState.hasHeaterBed) {
-        // extruder left, bed right
-        u8g2.drawUTF8(2, 62, line);
-        formatTemp(line, sizeof(line), "B", printerState.bedTemp, printerState.bedTarget);
-        u8g2.drawUTF8(126 - u8g2.getUTF8Width(line), 62, line);
-    } else {
-        // extruder only -> centered
-        u8g2.drawUTF8((128 - u8g2.getUTF8Width(line)) / 2, 62, line);
-    }
+    drawTempFooter();
 
     u8g2.sendBuffer();
 }
