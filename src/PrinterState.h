@@ -9,6 +9,7 @@ struct PrinterState {
     bool          klippyReady       = false;
     PrinterStatus status            = PrinterStatus::Offline;
     float         progress          = 0.0f;
+    float         printDuration     = 0.0f;
     float         extruderTemp      = 0.0f;
     float         extruderTarget    = 0.0f;
     float         bedTemp           = 0.0f;

@@ -141,6 +141,18 @@ static void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
                 display_makeDirty();
             }
 
+            // update print duration if it exists ("Preparing" detection)
+            if (!status["print_stats"]["print_duration"].isNull()) {
+                float newDuration = status["print_stats"]["print_duration"];
+
+                // only redraw when crossing the 0 boundary (preparing <> printing switch)
+                if ((printerState.printDuration <= 0.0f) != (newDuration <= 0.0f)) {
+                    display_makeDirty();
+                }
+
+                printerState.printDuration = newDuration;
+            }
+
             updateTemp(status["extruder"]["temperature"],   printerState.extruderTemp);
             updateTemp(status["extruder"]["target"],        printerState.extruderTarget);
             updateTemp(status["heater_bed"]["temperature"], printerState.bedTemp);
